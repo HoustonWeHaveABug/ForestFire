@@ -203,7 +203,7 @@ fire_t *fire_last, *fire_tmp;
 		puts("</H1>");
 		puts("</DIV>");
 	}
-	print_output("Initial state");
+	print_output("Initial map");
 	srand((unsigned)time(NULL));
 	fire_last = fires;
 	fire_next = fires+1;
@@ -219,7 +219,9 @@ fire_t *fire_last, *fire_tmp;
 	for (state = states; state < states_last; state++) {
 		state->count = 0;
 	}
-	print_output("Number of cycles done %lu", cycle);
+	if (cycle > 0) {
+		cycle > 1 ? print_output("Map after %lu cycles", cycle):print_output("Map after 1 cycle");
+	}
 	if (data_output == 2) {
 		puts("</BODY>");
 		puts("</HTML>");
@@ -339,7 +341,7 @@ cell_t *cell;
 		vprintf(title, arguments);
 		puts("\n");
 		for (state = states; state < states_last; state++) {
-			printf("%-9s %10lu %5.2f%%\n", state->name, state->count, state->percent);
+			printf("%-9s %10lu %6.2f%%\n", state->name, state->count, state->percent);
 		}
 		if (data_output == 1) {
 			puts("");
