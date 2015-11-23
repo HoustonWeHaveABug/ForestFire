@@ -15,48 +15,33 @@ struct state_s {
 	char background[7];
 };
 
-typedef struct cell_s cell_t;
-struct cell_s {
-	int state;
-	cell_t *n;
-	cell_t *ne;
-	cell_t *e;
-	cell_t *es;
-	cell_t *s;
-	cell_t *sw;
-	cell_t *w;
-	cell_t *wn;
-};
-
 typedef struct fire_s fire_t;
 struct fire_s {
-	cell_t **cells;
-	cell_t **cells_last;
+	int **cell_first;
+	int **cell_last;
 };
 
 void state_usage(const char *);
-int init_fire(fire_t *);
-void test_neighbours(cell_t *);
-void test_neighbour(cell_t *);
+void reset_fire(fire_t *, int **);
+void test_neighbours(int *);
+void test_neighbour(int *);
 int erand(int);
-void set_fire(fire_t *, cell_t *);
+void add_fire(fire_t *, int *);
 void print_output(const char *, ...);
 unsigned long test_class(const char *, const char *, unsigned long);
 void print_td(const char *, unsigned long, const char *, ...);
 void free_data(void);
 
-int *cells_init = NULL, propagation, data_output;
+int *cells_init = NULL, *cells = NULL, *cells_last, **cells_fire, **cells_fire_last, propagation, data_output;
 unsigned long cells_max, rows_max, columns_max, columns_html;
 state_t states[6] = { { "Glades", 0, 0.0, 'G', "g", "EECC88" }, { "Trees", 0, 0.0, 'T', "t", "008844" }, { "Water", 0, 0.0, 'W', "w", "2200AA" }, { "Buildings", 0, 0.0, 'B', "b", "000000" }, { "Fire", 0, 0.0, 'F', "f", "AA2200" }, { "Ashes", 0, 0.0, 'A', "a", "666666" } }, *states_last = states+6;
-cell_t *cells = NULL, *cells_last;
-fire_t fires[2] = { { NULL, NULL }, { NULL, NULL } }, *fire_next;
+fire_t *fire_next;
 
 int main(void) {
-int r, *cell_init, state_fill;
+int r, *cell_init, *cell, state_fill, **cell_fire;
 unsigned long rows_init, columns_init, row, column, distance_fill, cycles, cycle, px;
 state_t *state;
-cell_t *cell, **fire_cell;
-fire_t *fire_last, *fire_tmp;
+fire_t fires[2], *fire, *fire_tmp;
 	r = scanf("%lu", &rows_init);
 	if (r != 1 || rows_init == 0) {
 		fprintf(stderr, "Initial number of rows must be greater than 0.\n");
@@ -82,8 +67,7 @@ fire_t *fire_last, *fire_tmp;
 				free_data();
 				return EXIT_FAILURE;
 			}
-			*cell_init -= '0';
-			cell_init++;
+			*cell_init++ -= '0';
 		}
 		fgetc(stdin);
 	}
@@ -102,7 +86,7 @@ fire_t *fire_last, *fire_tmp;
 	rows_max = rows_init+distance_fill*2;
 	columns_max = columns_init+distance_fill*2;
 	cells_max = rows_max*columns_max;
-	cells = malloc(sizeof(cell_t)*cells_max);
+	cells = malloc(sizeof(int)*cells_max);
 	if (!cells) {
 		fprintf(stderr, "Cannot allocate memory for cells.\n");
 		free_data();
@@ -112,41 +96,31 @@ fire_t *fire_last, *fire_tmp;
 	cell = cells;
 	for (row = 1; row <= rows_max; row++) {
 		for (column = 1; column <= columns_max; column++) {
-			cell->state = state_fill;
-			cell->n = row > 1 ? cell-columns_max:NULL;
-			cell->ne = row > 1 && column < columns_max ? cell-columns_max+1:NULL;
-			cell->e = column < columns_max ? cell+1:NULL;
-			cell->es = row < rows_max && column < columns_max ? cell+columns_max+1:NULL;
-			cell->s = row < rows_max ? cell+columns_max:NULL;
-			cell->sw = row < rows_max && column > 1 ? cell+columns_max-1:NULL;
-			cell->w = column > 1 ? cell-1:NULL;
-			cell->wn = row > 1 && column > 1 ? cell-columns_max-1:NULL;
-			cell++;
+			*cell++ = state_fill;
 		}
 	}
-	r = init_fire(fires);
-	if (!r) {
+	cells_fire = malloc(sizeof(int *)*cells_max);
+	if (!cells_fire) {
+		fprintf(stderr, "Cannot allocate memory for fire cells.\n");
 		free_data();
 		return EXIT_FAILURE;
 	}
-	r = init_fire(fires+1);
-	if (!r) {
-		free_data();
-		return EXIT_FAILURE;
-	}
+	cells_fire_last = cells_fire+cells_max;
+	reset_fire(fires, cells_fire);
 	cell_init = cells_init;
 	cell = cells+distance_fill*columns_max+distance_fill;
 	for (row = 0; row < rows_init; row++) {
 		for (column = 0; column < columns_init; column++) {
-			cell->state = *cell_init;
+			*cell = *cell_init;
 			if (*cell_init == 4) {
-				set_fire(fires, cell);
+				add_fire(fires, cell);
 			}
 			cell_init++;
 			cell++;
 		}
 		cell += distance_fill*2;
 	}
+	reset_fire(fires+1, fires->cell_last);
 	r = scanf("%d", &propagation);
 	if (r != 1 || propagation < 0 || propagation > 100) {
 		fprintf(stderr, "Propagation factor must lie between 0 and 100.\n");
@@ -205,21 +179,26 @@ fire_t *fire_last, *fire_tmp;
 	}
 	print_output("Initial map");
 	srand((unsigned)time(NULL));
-	fire_last = fires;
+	fire = fires;
 	fire_next = fires+1;
-	for (cycle = 0; cycle < cycles && fire_last->cells < fire_last->cells_last; cycle++) {
-		for (fire_cell = fire_last->cells; fire_cell < fire_last->cells_last; fire_cell++) {
-			test_neighbours(*fire_cell);
+	for (cycle = 0; cycle < cycles && fire->cell_first != fire->cell_last; cycle++) {
+		for (cell_fire = fire->cell_first; cell_fire != fire->cell_last && cell_fire < cells_fire_last; cell_fire++) {
+			test_neighbours(*cell_fire);
 		}
-		fire_tmp = fire_last;
-		fire_last = fire_next;
+		if (cell_fire != fire->cell_last) {
+			for (cell_fire = cells_fire; cell_fire != fire->cell_last; cell_fire++) {
+				test_neighbours(*cell_fire);
+			}
+		}
+		fire_tmp = fire;
+		fire = fire_next;
 		fire_next = fire_tmp;
-		fire_next->cells_last = fire_next->cells;
-	}
-	for (state = states; state < states_last; state++) {
-		state->count = 0;
+		reset_fire(fire_next, fire->cell_last);
 	}
 	if (cycle > 0) {
+		for (state = states; state < states_last; state++) {
+			state->count = 0;
+		}
 		cycle > 1 ? print_output("Map after %lu cycles", cycle):print_output("Map after 1 cycle");
 	}
 	if (data_output == 2) {
@@ -234,32 +213,27 @@ void state_usage(const char *name) {
 	fprintf(stderr, "%s must equal 0 (glades), 1 (trees), 2 (water), 3 (buildings), 4 (fire) or 5 (ashes).\n", name);
 }
 
-int init_fire(fire_t *fire) {
-	fire->cells = malloc(sizeof(cell_t *)*cells_max);
-	if (!fire->cells) {
-		fprintf(stderr, "Cannot allocate memory for fire cells.\n");
-		return 0;
-	}
-	fire->cells_last = fire->cells;
-	return 1;
+void reset_fire(fire_t *fire, int **cell) {
+	fire->cell_first = cell;
+	fire->cell_last = cell;
 }
 
-void test_neighbours(cell_t *cell) {
-	cell->state = 5;
-	test_neighbour(cell->n);
-	test_neighbour(cell->ne);
-	test_neighbour(cell->e);
-	test_neighbour(cell->es);
-	test_neighbour(cell->s);
-	test_neighbour(cell->sw);
-	test_neighbour(cell->w);
-	test_neighbour(cell->wn);
+void test_neighbours(int *cell) {
+	*cell = 5;
+	test_neighbour(cell-columns_max);
+	test_neighbour(cell-columns_max+1);
+	test_neighbour(cell+1);
+	test_neighbour(cell+1+columns_max);
+	test_neighbour(cell+columns_max);
+	test_neighbour(cell+columns_max-1);
+	test_neighbour(cell-1);
+	test_neighbour(cell-1-columns_max);
 }
 
-void test_neighbour(cell_t *cell) {
-	if (cell && (cell->state == 1 || cell->state == 3) && erand(100) < propagation) {
-		cell->state = 4;
-		set_fire(fire_next, cell);
+void test_neighbour(int *cell) {
+	if (cell >= cells && cell < cells_last && (*cell == 1 || *cell == 3) && erand(100) < propagation) {
+		*cell = 4;
+		add_fire(fire_next, cell);
 	}
 }
 
@@ -267,19 +241,22 @@ int erand(int values) {
 	return (int)(rand()/(RAND_MAX+1.0)*values);
 }
 
-void set_fire(fire_t *fire, cell_t *cell) {
-	*(fire->cells_last) = cell;
-	fire->cells_last++;
+void add_fire(fire_t *fire, int *cell) {
+	*(fire->cell_last) = cell;
+	fire->cell_last++;
+	if (fire->cell_last == cells_fire_last) {
+		fire->cell_last = cells_fire;
+	}
 }
 
 void print_output(const char *title, ...) {
 char class[2], class_last[2];
+int *cell;
 unsigned long percent, column, row, colspan;
 va_list arguments;
 state_t *state;
-cell_t *cell;
 	for (cell = cells; cell < cells_last; cell++) {
-		states[cell->state].count++;
+		states[*cell].count++;
 	}
 	for (state = states; state < states_last; state++) {
 		state->percent = state->count*100.0/cells_max;
@@ -322,7 +299,7 @@ cell_t *cell;
 			colspan = 1;
 			for (column = 0; column < columns_max; column++) {
 				strcpy(class_last, class);
-				strcpy(class, states[cell->state].class);
+				strcpy(class, states[*cell].class);
 				colspan = test_class(class, class_last, colspan);
 				cell++;
 			}
@@ -348,7 +325,7 @@ cell_t *cell;
 			cell = cells;
 			for (row = 0; row < rows_max; row++) {
 				for (column = 0; column < columns_max; column++) {
-					printf("%c", states[cell->state].symbol);
+					printf("%c", states[*cell].symbol);
 					cell++;
 				}
 				puts("");
@@ -382,11 +359,8 @@ va_list arguments;
 }
 
 void free_data(void) {
-	if (fires[1].cells) {
-		free(fires[1].cells);
-	}
-	if (fires[0].cells) {
-		free(fires[0].cells);
+	if (cells_fire) {
+		free(cells_fire);
 	}
 	if (cells) {
 		free(cells);
