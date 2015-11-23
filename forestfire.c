@@ -7,6 +7,7 @@
 
 typedef struct state_s state_t;
 struct state_s {
+	int number;
 	char name[10];
 	unsigned long count;
 	double percent;
@@ -24,17 +25,16 @@ struct fire_s {
 void state_usage(const char *);
 void reset_fire(fire_t *, int **);
 void test_neighbours(int *);
-void test_neighbour(int *);
+void test_cell(int *);
 int erand(int);
 void add_fire(fire_t *, int *);
 void print_output(const char *, ...);
 unsigned long test_class(const char *, const char *, unsigned long);
 void print_td(const char *, unsigned long, const char *, ...);
-void free_data(void);
 
-int *cells_init = NULL, *cells = NULL, *cells_last, **cells_fire, **cells_fire_last, propagation, data_output;
-unsigned long cells_max, rows_max, columns_max, columns_html;
-state_t states[6] = { { "Glades", 0, 0.0, 'G', "g", "EECC88" }, { "Trees", 0, 0.0, 'T', "t", "008844" }, { "Water", 0, 0.0, 'W', "w", "2200AA" }, { "Buildings", 0, 0.0, 'B', "b", "000000" }, { "Fire", 0, 0.0, 'F', "f", "AA2200" }, { "Ashes", 0, 0.0, 'A', "a", "666666" } }, *states_last = states+6;
+int *cells_init, *cells, *cells_last, **cells_fire, **cells_fire_last, propagation, data_output;
+unsigned long cells_max, rows_max, columns_max;
+state_t states[6] = { { 0, "Water", 0, 0.0, 'W', "w", "2200AA" }, { 1, "Glades", 0, 0.0, 'G', "g", "EECC88" }, { 2, "Trees", 0, 0.0, 'T', "t", "008844" }, { 3, "Buildings", 0, 0.0, 'B', "b", "000000" }, { 4, "Fire", 0, 0.0, 'F', "f", "AA2200" }, { 5, "Ashes", 0, 0.0, 'A', "a", "666666" } }, *states_last = states+5;
 fire_t *fire_next;
 
 int main(void) {
@@ -64,7 +64,7 @@ fire_t fires[2], *fire, *fire_tmp;
 			*cell_init = fgetc(stdin);
 			if (*cell_init < '0' || *cell_init > '5') {
 				state_usage("Initial cell");
-				free_data();
+				free(cells_init);
 				return EXIT_FAILURE;
 			}
 			*cell_init++ -= '0';
@@ -74,13 +74,13 @@ fire_t fires[2], *fire, *fire_tmp;
 	r = scanf("%d", &state_fill);
 	if (r != 1 || state_fill < 0 || state_fill > 5) {
 		state_usage("Fill state");
-		free_data();
+		free(cells_init);
 		return EXIT_FAILURE;
 	}
 	r = scanf("%lu", &distance_fill);
 	if (r != 1) {
 		fprintf(stderr, "Fill distance is invalid.\n");
-		free_data();
+		free(cells_init);
 		return EXIT_FAILURE;
 	}
 	rows_max = rows_init+distance_fill*2;
@@ -89,7 +89,7 @@ fire_t fires[2], *fire, *fire_tmp;
 	cells = malloc(sizeof(int)*cells_max);
 	if (!cells) {
 		fprintf(stderr, "Cannot allocate memory for cells.\n");
-		free_data();
+		free(cells_init);
 		return EXIT_FAILURE;
 	}
 	cells_last = cells+cells_max;
@@ -102,7 +102,8 @@ fire_t fires[2], *fire, *fire_tmp;
 	cells_fire = malloc(sizeof(int *)*cells_max);
 	if (!cells_fire) {
 		fprintf(stderr, "Cannot allocate memory for fire cells.\n");
-		free_data();
+		free(cells);
+		free(cells_init);
 		return EXIT_FAILURE;
 	}
 	cells_fire_last = cells_fire+cells_max;
@@ -112,7 +113,7 @@ fire_t fires[2], *fire, *fire_tmp;
 	for (row = 0; row < rows_init; row++) {
 		for (column = 0; column < columns_init; column++) {
 			*cell = *cell_init;
-			if (*cell_init == 4) {
+			if (*cell == 4) {
 				add_fire(fires, cell);
 			}
 			cell_init++;
@@ -124,25 +125,30 @@ fire_t fires[2], *fire, *fire_tmp;
 	r = scanf("%d", &propagation);
 	if (r != 1 || propagation < 0 || propagation > 100) {
 		fprintf(stderr, "Propagation factor must lie between 0 and 100.\n");
-		free_data();
+		free(cells_fire);
+		free(cells);
+		free(cells_init);
 		return EXIT_FAILURE;
 	}
 	r = scanf("%lu", &cycles);
 	if (r != 1) {
 		fprintf(stderr, "Number of cycles is invalid.\n");
-		free_data();
+		free(cells_fire);
+		free(cells);
+		free(cells_init);
 		return EXIT_FAILURE;
 	}
 	r = scanf("%d", &data_output);
 	if (r != 1 || data_output < 0 || data_output > 2) {
 		fprintf(stderr, "Data output mode must equal 0 (no output), 1 (text) or 2 (html).\n");
-		free_data();
+		free(cells_fire);
+		free(cells);
+		free(cells_init);
 		return EXIT_FAILURE;
 	}
 	if (data_output == 2) {
-		columns_html = columns_max+2;
 		px = 1;
-		while (columns_html*px < 400) px++;
+		while (columns_max*px < 400) px++;
 		puts("<!DOCTYPE HTML>");
 		puts("<HTML DIR=\"ltr\" LANG=\"en\">");
 		puts("<HEAD>");
@@ -160,7 +166,7 @@ fire_t fires[2], *fire, *fire_tmp;
 		puts("CAPTION { background-color: #666666; color: #EEEEEE; font-size: 14px; font-weight: bold; padding: 2px 6px 2px 6px; }");
 		puts("TD.text { padding: 2px 6px 2px 6px; text-align: left; }");
 		puts("TD.number { padding: 2px 6px 2px 6px; text-align: right; }");
-		for (state = states; state < states_last; state++) {
+		for (state = states; state <= states_last; state++) {
 			printf("TD.%s { background-color: #%s; height: %lupx; width: %lupx; }\n", state->class, state->background, px, px);
 		}
 		puts("</STYLE>");
@@ -196,7 +202,7 @@ fire_t fires[2], *fire, *fire_tmp;
 		reset_fire(fire_next, fire->cell_last);
 	}
 	if (cycle > 0) {
-		for (state = states; state < states_last; state++) {
+		for (state = states; state <= states_last; state++) {
 			state->count = 0;
 		}
 		cycle > 1 ? print_output("Map after %lu cycles", cycle):print_output("Map after 1 cycle");
@@ -205,12 +211,19 @@ fire_t fires[2], *fire, *fire_tmp;
 		puts("</BODY>");
 		puts("</HTML>");
 	}
-	free_data();
+	free(cells_fire);
+	free(cells);
+	free(cells_init);
 	return EXIT_SUCCESS;
 }
 
 void state_usage(const char *name) {
-	fprintf(stderr, "%s must equal 0 (glades), 1 (trees), 2 (water), 3 (buildings), 4 (fire) or 5 (ashes).\n", name);
+state_t *state = states;
+	fprintf(stderr, "%s must equal %d (%s)", name, state->number, state->name);
+	for (state++; state < states_last; state++) {
+		fprintf(stderr, ", %d (%s)", state->number, state->name);
+	}
+	fprintf(stderr, " or %d (%s).\n", state->number, state->name);
 }
 
 void reset_fire(fire_t *fire, int **cell) {
@@ -220,18 +233,18 @@ void reset_fire(fire_t *fire, int **cell) {
 
 void test_neighbours(int *cell) {
 	*cell = 5;
-	test_neighbour(cell-columns_max);
-	test_neighbour(cell-columns_max+1);
-	test_neighbour(cell+1);
-	test_neighbour(cell+1+columns_max);
-	test_neighbour(cell+columns_max);
-	test_neighbour(cell+columns_max-1);
-	test_neighbour(cell-1);
-	test_neighbour(cell-1-columns_max);
+	test_cell(cell-columns_max);
+	test_cell(cell-columns_max+1);
+	test_cell(cell+1);
+	test_cell(cell+1+columns_max);
+	test_cell(cell+columns_max);
+	test_cell(cell+columns_max-1);
+	test_cell(cell-1);
+	test_cell(cell-1-columns_max);
 }
 
-void test_neighbour(int *cell) {
-	if (cell >= cells && cell < cells_last && (*cell == 1 || *cell == 3) && erand(100) < propagation) {
+void test_cell(int *cell) {
+	if (cell >= cells && cell < cells_last && (*cell == 2 || *cell == 3) && erand(100) < propagation) {
 		*cell = 4;
 		add_fire(fire_next, cell);
 	}
@@ -258,7 +271,7 @@ state_t *state;
 	for (cell = cells; cell < cells_last; cell++) {
 		states[*cell].count++;
 	}
-	for (state = states; state < states_last; state++) {
+	for (state = states; state <= states_last; state++) {
 		state->percent = state->count*100.0/cells_max;
 	}
 	va_start(arguments, title);
@@ -268,7 +281,7 @@ state_t *state;
 		printf("<CAPTION>");
 		vprintf(title, arguments);
 		puts(" - Statistics</CAPTION>");
-		for (state = states; state < states_last; state++) {
+		for (state = states; state <= states_last; state++) {
 			puts("<TR>");
 			print_td("text", 1UL, "%s", state->name);
 			print_td("number", 1UL, "%lu", state->count);
@@ -286,30 +299,28 @@ state_t *state;
 		printf("<CAPTION>");
 		vprintf(title, arguments);
 		puts(" - Data</CAPTION>");
+		cell = cells;
 		puts("<TR>");
-		for (column = 0; column < columns_html; column++) {
-			print_td("g", 1UL, "");
+		for (column = 0; column < columns_max; column++) {
+			print_td(states[*cell].class, 1UL, "");
+			cell++;
 		}
 		puts("</TR>");
-		cell = cells;
-		for (row = 0; row < rows_max; row++) {
+		for (row = 1; row < rows_max; row++) {
 			puts("<TR>");
-			strcpy(class, "g");
 			strcpy(class_last, "?");
+			strcpy(class, states[*cell].class);
 			colspan = 1;
-			for (column = 0; column < columns_max; column++) {
+			cell++;
+			for (column = 1; column < columns_max; column++) {
 				strcpy(class_last, class);
 				strcpy(class, states[*cell].class);
 				colspan = test_class(class, class_last, colspan);
 				cell++;
 			}
 			print_td(class, colspan, "");
-			print_td("g", 1UL, "");
 			puts("</TR>");
 		}
-		puts("<TR>");
-		print_td("g", columns_html, "");
-		puts("</TR>");
 		puts("</TABLE>");
 		puts("</DIV>");
 	}
@@ -317,7 +328,7 @@ state_t *state;
 		puts("");
 		vprintf(title, arguments);
 		puts("\n");
-		for (state = states; state < states_last; state++) {
+		for (state = states; state <= states_last; state++) {
 			printf("%-9s %10lu %6.2f%%\n", state->name, state->count, state->percent);
 		}
 		if (data_output == 1) {
@@ -356,16 +367,4 @@ va_list arguments;
 	vprintf(format, arguments);
 	va_end(arguments);
 	puts("</TD>");
-}
-
-void free_data(void) {
-	if (cells_fire) {
-		free(cells_fire);
-	}
-	if (cells) {
-		free(cells);
-	}
-	if (cells_init) {
-		free(cells_init);
-	}
 }
