@@ -39,7 +39,7 @@ fire_t *fire_next;
 
 int main(void) {
 int r, *cell_init, *cell, state_fill, **cell_fire;
-unsigned long rows_init, columns_init, row, column, distance_fill, cycles, cycle, px;
+unsigned long rows_init, columns_init, row, column, cycles, cycle, px;
 state_t *state;
 fire_t fires[2], *fire, *fire_tmp;
 	r = scanf("%lu", &rows_init);
@@ -77,14 +77,14 @@ fire_t fires[2], *fire, *fire_tmp;
 		free(cells_init);
 		return EXIT_FAILURE;
 	}
-	r = scanf("%lu", &distance_fill);
+	r = scanf("%lu", &cycles);
 	if (r != 1) {
-		fprintf(stderr, "Fill distance is invalid.\n");
+		fprintf(stderr, "Number of cycles is invalid.\n");
 		free(cells_init);
 		return EXIT_FAILURE;
 	}
-	rows_max = rows_init+distance_fill*2;
-	columns_max = columns_init+distance_fill*2;
+	rows_max = rows_init+cycles*2;
+	columns_max = columns_init+cycles*2;
 	cells_max = rows_max*columns_max;
 	cells = malloc(sizeof(int)*cells_max);
 	if (!cells) {
@@ -93,12 +93,6 @@ fire_t fires[2], *fire, *fire_tmp;
 		return EXIT_FAILURE;
 	}
 	cells_last = cells+cells_max;
-	cell = cells;
-	for (row = 1; row <= rows_max; row++) {
-		for (column = 1; column <= columns_max; column++) {
-			*cell++ = state_fill;
-		}
-	}
 	cells_fire = malloc(sizeof(int *)*cells_max);
 	if (!cells_fire) {
 		fprintf(stderr, "Cannot allocate memory for fire cells.\n");
@@ -109,8 +103,16 @@ fire_t fires[2], *fire, *fire_tmp;
 	cells_fire_last = cells_fire+cells_max;
 	reset_fire(fires, cells_fire);
 	cell_init = cells_init;
-	cell = cells+distance_fill*columns_max+distance_fill;
+	cell = cells;
+	for (row = 0; row < cycles; row++) {
+		for (column = 0; column < columns_max; column++) {
+			*cell++ = state_fill;
+		}
+	}
 	for (row = 0; row < rows_init; row++) {
+		for (column = 0; column < cycles; column++) {
+			*cell++ = state_fill;
+		}
 		for (column = 0; column < columns_init; column++) {
 			*cell = *cell_init;
 			if (*cell == 4) {
@@ -119,20 +121,19 @@ fire_t fires[2], *fire, *fire_tmp;
 			cell_init++;
 			cell++;
 		}
-		cell += distance_fill*2;
+		for (column = 0; column < cycles; column++) {
+			*cell++ = state_fill;
+		}
+	}
+	for (row = 0; row < cycles; row++) {
+		for (column = 0; column < columns_max; column++) {
+			*cell++ = state_fill;
+		}
 	}
 	reset_fire(fires+1, fires->cell_last);
 	r = scanf("%d", &propagation);
 	if (r != 1 || propagation < 0 || propagation > 100) {
 		fprintf(stderr, "Propagation factor must lie between 0 and 100.\n");
-		free(cells_fire);
-		free(cells);
-		free(cells_init);
-		return EXIT_FAILURE;
-	}
-	r = scanf("%lu", &cycles);
-	if (r != 1) {
-		fprintf(stderr, "Number of cycles is invalid.\n");
 		free(cells_fire);
 		free(cells);
 		free(cells_init);
