@@ -197,11 +197,11 @@ factor_t *factors_out = factors+FACTORS_OUT, *factor;
 		puts("A:hover { color: #EEEEEE; }");
 		puts("DIV.data { background-color: #CCCCCC; }");
 		puts("TABLE { background-color: #EEEEEE; border-collapse: collapse; margin: 6px auto 6px auto; }");
-		puts("CAPTION { background-color: #666666; color: #EEEEEE; font-size: 14px; font-weight: bold; padding: 2px 6px 2px 6px; }");
-		puts("TD.title { font-weight: bold; padding: 2px 6px 2px 6px; text-align: center; }");
-		puts("TD.left { padding: 2px 6px 2px 6px; text-align: left; }");
-		puts("TD.right { padding: 2px 6px 2px 6px; text-align: right; }");
-		puts("TD.center { padding: 2px 6px 2px 6px; text-align: center; }");
+		puts("CAPTION { background-color: #666666; color: #EEEEEE; font-size: 16px; font-weight: bold; padding: 2px 6px 2px 6px; }");
+		puts("TD.title { font-size: 14px; font-weight: bold; padding: 2px 6px 2px 6px; text-align: center; }");
+		puts("TD.left { font-size: 14px; padding: 2px 6px 2px 6px; text-align: left; }");
+		puts("TD.right { font-size: 14px; padding: 2px 6px 2px 6px; text-align: right; }");
+		puts("TD.center { font-size: 14px; padding: 2px 6px 2px 6px; text-align: center; }");
 		for (state = states; state <= state_last; state++) {
 			printf("TD.%s { background-color: #%s; height: %lupx; width: %lupx; }\n", state->class, state->background, px, px);
 		}
