@@ -9,15 +9,15 @@
 #define CLASS_LEN 1
 #define BACKGROUND_LEN 6
 #define DIRECTION_LEN 2
-#define STATES_OUT 7
 #define STATE_FIRE 4
-#define STATE_EMBERS 5
+#define STATE_LAST 6
+#define FIRE_CYCLES STATE_LAST-STATE_FIRE
 #define FACTORS_OUT 8
 #define ERAND_MAX 100
 #define DATA_OUTPUT_NONE 0
 #define DATA_OUTPUT_TEXT 1
 #define DATA_OUTPUT_HTML 2
-#define DATA_PX_MIN 400
+#define DATA_PX_MIN 300
 #define PERCENT_DIGITS 3
 #define PERCENT_PRECISION 2
 
@@ -27,7 +27,7 @@ struct state_s {
 	int symbol;
 	char class[CLASS_LEN+1];
 	char background[BACKGROUND_LEN+1];
-	int propagations[2];
+	int propagations[FIRE_CYCLES];
 	unsigned long count;
 	double percent;
 };
@@ -61,12 +61,12 @@ void print_td(const char *, unsigned long, const char *, ...);
 
 int *cells_init, *cells, *cells_out, **cells_fifo, **cells_fifo_out, data_output;
 unsigned long rows_max, columns_max, cells_max;
-state_t states[STATES_OUT] = { { 0, "Water", 'W', "w", "2200AA", { 0, 0 }, 0, 0.0 }, { 1, "Glades", 'G', "g", "EECC88", { 0, 0 }, 0, 0.0 }, { 2, "Trees", 'T', "t", "008844", { 0, 0 }, 0, 0.0 }, { 3, "Buildings", 'B', "b", "000000", { 0, 0 }, 0, 0.0 }, { 4, "Fire", 'F', "f", "AA2200", { 0, 0 }, 0, 0.0 }, { 5, "Embers", 'E', "e", "EE6600", { 0, 0 }, 0, 0.0 }, { 6, "Ashes", 'A', "a", "666666", { 0, 0 }, 0, 0.0 } }, *state_fire = states+STATE_FIRE, *state_embers = states+STATE_EMBERS, *state_last = states+STATES_OUT-1;
+state_t states[STATE_LAST+1] = { { 0, "Water", 'W', "w", "2200AA", { 0, 0 }, 0, 0.0 }, { 1, "Glades", 'G', "g", "EECC88", { 0, 0 }, 0, 0.0 }, { 2, "Trees", 'T', "t", "008844", { 0, 0 }, 0, 0.0 }, { 3, "Buildings", 'B', "b", "000000", { 0, 0 }, 0, 0.0 }, { 4, "Fire", 'F', "f", "AA2200", { 0, 0 }, 0, 0.0 }, { 5, "Embers", 'E', "e", "EE6600", { 0, 0 }, 0, 0.0 }, { 6, "Ashes", 'A', "a", "666666", { 0, 0 }, 0, 0.0 } }, *state_fire = states+STATE_FIRE, *state_last = states+STATE_LAST;
 fifo_t *fifo_next;
 factor_t factors[FACTORS_OUT] = { { "N", 1, 1 }, { "NE", 1, 1 }, { "E", 1, 1 }, { "ES", 1, 1 }, { "S", 1, 1 }, { "SW", 1, 1 }, { "W", 1, 1 }, { "WN", 1, 1 } };
 
 int main(void) {
-int *cell_init, *cell, state_fill, **cell_fifo;
+int *cell_init, *cell, state_fill, fire_cycle, **cell_fifo;
 unsigned long rows_init, columns_init, row, column, cycles, cycle, px;
 state_t *state;
 fifo_t fifos[2], *fifo, *fifo_tmp;
@@ -89,7 +89,7 @@ factor_t *factors_out = factors+FACTORS_OUT, *factor;
 	for (row = 0; row < rows_init; row++) {
 		for (column = 0; column < columns_init; column++) {
 			*cell_init = fgetc(stdin);
-			if (*cell_init < '0' || *cell_init >= '0'+STATES_OUT) {
+			if (*cell_init < '0' || *cell_init > '0'+STATE_LAST) {
 				state_usage("Initial cell");
 				free(cells_init);
 				return EXIT_FAILURE;
@@ -98,7 +98,7 @@ factor_t *factors_out = factors+FACTORS_OUT, *factor;
 		}
 		fgetc(stdin);
 	}
-	if (scanf("%d", &state_fill) != 1 || state_fill < 0 || state_fill >= STATES_OUT) {
+	if (scanf("%d", &state_fill) != 1 || state_fill < 0 || state_fill > STATE_LAST) {
 		state_usage("Fill state");
 		free(cells_init);
 		return EXIT_FAILURE;
@@ -140,7 +140,7 @@ factor_t *factors_out = factors+FACTORS_OUT, *factor;
 		}
 		for (column = 0; column < columns_init; column++) {
 			*cell = *cell_init;
-			if (*cell == STATE_FIRE || *cell == STATE_EMBERS) {
+			if (*cell >= STATE_FIRE && *cell < STATE_LAST) {
 				add_fifo(fifos, cell);
 			}
 			cell_init++;
@@ -157,11 +157,13 @@ factor_t *factors_out = factors+FACTORS_OUT, *factor;
 	}
 	reset_fifo(fifos+1, fifos->cell_last);
 	for (state = states; state < state_fire; state++) {
-		if (!set_propagation(state->propagations) || !set_propagation(state->propagations+1)) {
-			free(cells_fifo);
-			free(cells);
-			free(cells_init);
-			return EXIT_FAILURE;
+		for (fire_cycle = 0; fire_cycle < FIRE_CYCLES; fire_cycle++) {
+			if (!set_propagation(&state->propagations[fire_cycle])) {
+				free(cells_fifo);
+				free(cells);
+				free(cells_init);
+				return EXIT_FAILURE;
+			}
 		}
 	}
 	for (factor = factors; factor < factors_out; factor++) {
@@ -223,14 +225,16 @@ factor_t *factors_out = factors+FACTORS_OUT, *factor;
 		puts("<CAPTION>Propagation ratios</CAPTION>");
 		puts("<TR>");
 		print_td("title", 1UL, "");
-		print_td("title", 1UL, "%s", state_fire->name);
-		print_td("title", 1UL, "%s", state_embers->name);
+		for (state = state_fire; state < state_last; state++) {
+			print_td("title", 1UL, "%s", state->name);
+		}
 		puts("</TR>");
 		for (state = states; state < state_fire; state++) {
 			puts("<TR>");
 			print_td("left", 1UL, "%s", state->name);
-			print_td("right", 1UL, "%d%%", state->propagations[0]);
-			print_td("right", 1UL, "%d%%", state->propagations[1]);
+			for (fire_cycle = 0; fire_cycle < FIRE_CYCLES; fire_cycle++) {
+				print_td("right", 1UL, "%d%%", state->propagations[fire_cycle]);
+			}
 			puts("</TR>");
 		}
 		puts("</TABLE>");
@@ -247,9 +251,17 @@ factor_t *factors_out = factors+FACTORS_OUT, *factor;
 	}
 	else {
 		puts("\nPropagation ratios\n");
-		printf("%-*s %*s %*s\n\n", NAME_LEN, "", NAME_LEN, state_fire->name, NAME_LEN, state_embers->name);
+		printf("%-*s", NAME_LEN, "");
+		for (state = state_fire; state < state_last; state++) {
+			printf(" %*s", NAME_LEN, state->name);
+		}
+		puts("\n");
 		for (state = states; state < state_fire; state++) {
-			printf("%-*s%*d%%%*d%%\n", NAME_LEN, state->name, NAME_LEN, state->propagations[0], NAME_LEN, state->propagations[1]);
+			printf("%-*s", NAME_LEN, state->name);
+			for (fire_cycle = 0; fire_cycle < FIRE_CYCLES; fire_cycle++) {
+				printf("%*d%%", NAME_LEN, state->propagations[fire_cycle]);
+			}
+			puts("");
 		}
 		puts("\nWind factors\n");
 		for (factor = factors; factor < factors_out; factor++) {
@@ -319,23 +331,23 @@ int set_propagation(int *propagation) {
 	}
 }
 
-void test_neighbours(int *cell, int propagation) {
-	test_cell(cell-columns_max, propagation, factors);
-	test_cell(cell-columns_max+1, propagation, factors+1);
-	test_cell(cell+1, propagation, factors+2);
-	test_cell(cell+1+columns_max, propagation, factors+3);
-	test_cell(cell+columns_max, propagation, factors+4);
-	test_cell(cell+columns_max-1, propagation, factors+5);
-	test_cell(cell-1, propagation, factors+6);
-	test_cell(cell-1-columns_max, propagation, factors+7);
+void test_neighbours(int *cell, int fire_cycle) {
+	test_cell(cell-columns_max, fire_cycle, factors);
+	test_cell(cell-columns_max+1, fire_cycle, factors+1);
+	test_cell(cell+1, fire_cycle, factors+2);
+	test_cell(cell+1+columns_max, fire_cycle, factors+3);
+	test_cell(cell+columns_max, fire_cycle, factors+4);
+	test_cell(cell+columns_max-1, fire_cycle, factors+5);
+	test_cell(cell-1, fire_cycle, factors+6);
+	test_cell(cell-1-columns_max, fire_cycle, factors+7);
 	(*cell)++;
-	if (*cell == STATE_EMBERS) {
+	if (*cell < STATE_LAST) {
 		add_fifo(fifo_next, cell);
 	}
 }
 
-void test_cell(int *cell, int propagation, factor_t *factor) {
-	if (cell >= cells && cell < cells_out && *cell < STATE_FIRE && erand(ERAND_MAX) < states[*cell].propagations[propagation]*factor->numerator/factor->denominator) {
+void test_cell(int *cell, int fire_cycle, factor_t *factor) {
+	if (cell >= cells && cell < cells_out && *cell < STATE_FIRE && erand(ERAND_MAX) < states[*cell].propagations[fire_cycle]*factor->numerator/factor->denominator) {
 		*cell = STATE_FIRE;
 		add_fifo(fifo_next, cell);
 	}
