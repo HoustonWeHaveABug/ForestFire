@@ -340,8 +340,7 @@ void test_neighbours(int *cell, int fire_cycle) {
 	test_cell(cell+columns_max-1, fire_cycle, factors+5);
 	test_cell(cell-1, fire_cycle, factors+6);
 	test_cell(cell-1-columns_max, fire_cycle, factors+7);
-	(*cell)++;
-	if (*cell < STATE_LAST) {
+	if (++(*cell) < STATE_LAST) {
 		add_fifo(fifo_next, cell);
 	}
 }
@@ -359,8 +358,7 @@ int erand(int values) {
 
 void add_fifo(fifo_t *fifo, int *cell) {
 	*(fifo->cell_last) = cell;
-	fifo->cell_last++;
-	if (fifo->cell_last == cells_fifo_out) {
+	if (++fifo->cell_last == cells_fifo_out) {
 		fifo->cell_last = cells_fifo;
 	}
 }
