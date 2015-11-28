@@ -54,7 +54,7 @@ void test_cell(int *, int, factor_t *);
 int erand(int);
 void add_fifo(fifo_t *, int *);
 void html_factors_row(factor_t *, factor_t *, factor_t *);
-void html_factor(const char *, factor_t *);
+void html_factor(factor_t *);
 void print_output(const char *, ...);
 unsigned long test_class(const char *, const char *, unsigned long);
 void print_td(const char *, unsigned long, const char *, ...);
@@ -242,9 +242,9 @@ factor_t *factors_out = factors+FACTORS_OUT, *factor;
 		puts("<CAPTION>Wind factors</CAPTION>");
 		html_factors_row(factors+7, factors, factors+1);
 		puts("<TR>");
-		html_factor("center", factors+6);
+		html_factor(factors+6);
 		print_td("center", 1UL, "<IMG ALT=\"Compass\" SRC=\"forestfire_compass.png\" />");
-		html_factor("center", factors+2);
+		html_factor(factors+2);
 		puts("</TR>");
 		html_factors_row(factors+5, factors+4, factors+3);
 		puts("</TABLE>");
@@ -367,14 +367,14 @@ void add_fifo(fifo_t *fifo, int *cell) {
 
 void html_factors_row(factor_t *factor_a, factor_t *factor_b, factor_t *factor_c) {
 	puts("<TR>");
-	html_factor("center", factor_a);
-	html_factor("center", factor_b);
-	html_factor("center", factor_c);
+	html_factor(factor_a);
+	html_factor(factor_b);
+	html_factor(factor_c);
 	puts("</TR>");
 }
 
-void html_factor(const char *class, factor_t *factor) {
-	factor->denominator > 1 ? print_td(class, 1UL, "%s %d/%d", factor->direction, factor->numerator, factor->denominator):print_td(class, 1UL, "%s %d", factor->direction, factor->numerator);
+void html_factor(factor_t *factor) {
+	factor->denominator > 1 ? print_td("center", 1UL, "%s %d/%d", factor->direction, factor->numerator, factor->denominator):print_td("center", 1UL, "%s %d", factor->direction, factor->numerator);
 }
 
 void print_output(const char *title, ...) {
